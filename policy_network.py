@@ -8,7 +8,8 @@ import torch.optim as optim
 from torch.autograd import Variable
 import argparse
 
-PATH = "./opponent.pt"
+OPP_PATH = "./opponent.pt"
+PATH = "./model.pt"
 
 # Neural network for the policy
 # Takes th current state and return the probability of each action
@@ -81,7 +82,7 @@ class Policy_grad():
 
             # Load prev model as opponent
             if (episode != 0):
-                opponent = torch.load(PATH)
+                opponent = torch.load(OPP_PATH)
             else:
                 opponent = policy
 
@@ -216,7 +217,7 @@ class Policy_grad():
             # loss = sum over traj ( sum over time (log pi(at\st)*A_t))
 
             # Save current model
-            torch.save(policy, PATH)
+            torch.save(policy, OPP_PATH)
 
             loss = -loss/traj_size  # Negative sign to perform gradient ascent
             loss.backward()
@@ -230,6 +231,8 @@ class Policy_grad():
             # print(loss)
             # print("==============================================")
             episode += 1
+
+        torch.save(policy, PATH)
 
     # Fnction to calculate Gt value for a trajectory
     def discount_rewards(self,traj_rewards):
