@@ -8,6 +8,8 @@ import torch.optim as optim
 from torch.autograd import Variable
 import argparse
 
+PATH = "./opponent.pt"
+
 # Neural network for the policy
 # Takes th current state and return the probability of each action
 class Policy_network(nn.Module):
@@ -72,12 +74,16 @@ class Policy_grad():
         action_space = np.arange(self.env.action_space.n)
 
         episode = 0
+
         # Loop for each episode
         while episode < self.episodes:
             state = self.env.reset() # Reset environment and record the starting state
 
-            # print(state)
-            # print(env.observation_space.shape[0])
+            # Load prev model as opponent
+            if (episode != 0):
+                opponent = torch.load(PATH)
+            else:
+                opponent = policy
 
             total_rewards = []
 
@@ -109,18 +115,13 @@ class Policy_grad():
                     # Here action is a single int from 0 to W^2 - 1
                     action = np.random.choice(action_space, p=action_probs)
 
-                    # print(action)
-                    # print(state)
-
                     # Check if action is valid
                     # Invalid moves are stores in 4th channel of the state
                     invalid_moves = state[3].flatten()
-                    # print(invalid_moves)
 
                     # action equal W^2 indicates a pass action and is always valid
                     if (action < env.observation_space.shape[1]**2 and invalid_moves[action] == 1): # Move is invalid. automatic Pass
                         action = env.observation_space.shape[1]**2
-
 
                     # Step through environment using chosen action
                     state, reward, done, _ = self.env.step(action) # Update state, Save reward
@@ -132,6 +133,32 @@ class Policy_grad():
                     rewards.append(reward)
                     actions.append(action)
                     step = step + 1
+
+                    self.env.render()
+
+
+                    if done:
+                        break
+
+                    # OPPONENT MOVE
+
+                    # Get action probs from opponent
+                    action_probs_opp = opponent(torch.FloatTensor(state).unsqueeze(dim=0)).squeeze().detach().numpy()
+
+                    # sample action
+                    # Here action is a single int from 0 to W^2 - 1
+                    action_opp = np.random.choice(action_space, p=action_probs_opp)
+
+                    # Check if action is valid
+                    # Invalid moves are stores in 4th channel of the state
+                    invalid_moves_opp = state[3].flatten()
+
+                    # action equal W^2 indicates a pass action and is always valid
+                    if (action_opp < env.observation_space.shape[1]**2 and invalid_moves_opp[action_opp] == 1): # Move is invalid. automatic Pass
+                        action_opp = env.observation_space.shape[1]**2
+
+                    # Step through environment using chosen action
+                    state, reward, done, _ = self.env.step(action_opp) # Update state, Save reward
 
                     if done:
                         break
@@ -147,18 +174,11 @@ class Policy_grad():
                 state_tensor = torch.FloatTensor(states)
                 action_tensor = torch.LongTensor(actions)
 
-                # print(policy(state_tensor))
-                # print(actions)
-
-                # print(policy(state_tensor).gather(1, action_tensor.view(-1,1)))
-
                 logprob = torch.log(policy(state_tensor).gather(1, action_tensor.view(-1,1))) # log pi(at|st)
-                # print(logprob)
 
                 # Store G_t and log pi(at|st) for each time step in this trajectory
                 store_logits.append(logprob)
                 store_at.append(G_t_array)
-                    # print(store_product)
 
             optimizer.zero_grad()
 
@@ -195,7 +215,10 @@ class Policy_grad():
 
             # loss = sum over traj ( sum over time (log pi(at\st)*A_t))
 
-            loss = -loss  # Negative sign to perform gradient ascent
+            # Save current model
+            torch.save(policy, PATH)
+
+            loss = -loss/traj_size  # Negative sign to perform gradient ascent
             loss.backward()
 
             optimizer.step()

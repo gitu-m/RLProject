@@ -9,10 +9,10 @@ from gym import envs
 
 go_env = gym.make('gym_go:go-v0', size=5, reward_method='heuristic')
 
-state, reward, done, _ = go_env.step((2,2))
-go_env.render()
+# state, reward, done, _ = go_env.step((2,2))
+# go_env.render()
 # print(state)
 
 
 
-Policy_grad(10, 10, 0.001, 0.99, go_env, False, True)
+Policy_grad(100, 10, 0.001, 0.99, go_env, False, True)
