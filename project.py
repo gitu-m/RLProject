@@ -46,12 +46,19 @@ while not done :
     # Let model make move
     action_probs = policy(torch.FloatTensor(state).unsqueeze(dim=0)).squeeze().detach().numpy()
     action = np.random.choice(action_space, p=action_probs)
-
+    print(action)
+    coord1 = []
+    x = action//5
+    y = action % 5
+    coord1.append(x)
+    coord1.append(y)
+    print(tuple(coord1))
+    
     # Calc move to board for pachi
     if (action == go_env.observation_space.shape[1]**2):
-        move_pachi_board = pachi_py.PASS_COORD
+        move_in_pachi = pachi_py.PASS_COORD
     else:
-        move_pachi_board = (action//5)*7 + action%5 + 8
+        move_in_pachi = b.ij_to_coord(coord1[0],coord1[1])
 
     # Check if action is valid
     # Invalid moves are stores in 4th channel of the state
@@ -60,36 +67,49 @@ while not done :
     # action equal W^2 indicates a pass action and is always valid
     if (action < go_env.observation_space.shape[1]**2 and invalid_moves[action] == 1): # Move is invalid. automatic Pass
         action = go_env.observation_space.shape[1]**2
-        move_pachi_board = pachi_py.PASS_COORD #PASS coord for the engine
+        move_in_pachi = pachi_py.PASS_COORD #PASS coord for the engine
 
-    print("WHITE: action: %d pachi: %d" % (action, move_pachi_board))
-
+    print("BLACK: action: %d pachi: %d" % (action, move_in_pachi))
     # Step through environment using chosen action
     state, reward, done, _ = go_env.step(action) # Update state, Save reward
-    b.play_inplace(move_pachi_board, pachi_py.WHITE)
-    engine.notify(move_pachi_board, pachi_py.WHITE)
+    b.play_inplace(move_in_pachi, pachi_py.BLACK)
+    engine.notify(move_in_pachi, pachi_py.BLACK)
+    print(go_env)
 
     if done:
         break
 
     time += 1
     time_str = str(time)
-    pachi_move = engine.genmove(pachi_py.WHITE, time_str.encode('utf-8'))
+    pachi_move = engine.genmove(pachi_py.BLACK, time_str.encode('utf-8'))
 
-    b.play_inplace(pachi_move, pachi_py.BLACK)
 
     if (pachi_move == -2): #Resign
         done = True
         print("Resign")
         break
 
+    coord2 = b.coord_to_ij(pachi_move)
+    print(coord2)
     # Step through environment using chosen action
-    pachi_env_move = ((pachi_move - 8)//7)*5 + pachi_move%7
+    move = 5*coord2[0] + coord2[1] 
+    # Check if action is valid
+    # Invalid moves are stores in 4th channel of the state
+    invalid_moves = state[3].flatten()
+
+    # action equal W^2 indicates a pass action and is always valid
+    if (move < go_env.observation_space.shape[1]**2 and invalid_moves[move] == 1): # Move is invalid. automatic Pass
+        move = go_env.observation_space.shape[1]**2
+        move = pachi_py.PASS_COORD #PASS coord for the engine
 
     if (pachi_move == pachi_py.PASS_COORD):
-        pachi_env_move = go_env.observation_space.shape[1]**2
+        move = go_env.observation_space.shape[1]**2
 
-    print("BLACK: action: %d pachi: %d" % (pachi_env_move, pachi_move))
-    state, reward, done, _ = go_env.step(pachi_env_move) # Update state, Save reward
+    print("WHITE: action: %d pachi: %d" % (move, pachi_move))
+    b.play_inplace(pachi_move, pachi_py.WHITE)
+    state, reward, done, _ = go_env.step(move) # Update state, Save reward
+    print(go_env)
 
     time += 1
+
+   
